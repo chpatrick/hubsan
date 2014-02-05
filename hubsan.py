@@ -1,17 +1,30 @@
 from a7105 import *
+import time
+import logging
 
 class Hubsan:
   # not sure if byte order is correct
   ID = '\x55\x20\x10\x41'
+  CALIBRATION_MAX_CHECKS = 3
 
   def __init__(self):
     self.a7105 = A7105()
 
   def init(self):
+    self.a7105.init()
+
+    self.init_regs()
+
+    # go into Standby mode
+    self.a7105.strobe(State.STANDBY)
+
+    self.calibrate_if()
+    self.calibrate_vco()
+
+  def init_regs(self):
     a = self.a7105
 
-    a.init()
-
+    logging.debug('    initializing registers`')
     a.write_id(Hubsan.ID)
     # set various radio options
     a.write_reg(Reg.MODE_CONTROL, 0x63)
@@ -37,8 +50,52 @@ class Hubsan:
     # set constants
     a.write_reg(Reg.RX_DEM_TEST, 0x47)
 
-    # go into Standby mode
-    a.strobe(State.STANDBY)
+  # WTF: these seem to differ from the A7105 spec, this is the deviation version
+  def calibrate_if(self):
+    logging.debug('    calibrating IF bank')
+
+    # select IF calibration
+    self.a7105.write_reg(Reg.CALIBRATION, 0b001)
+
+    # WTF: deviation reads calibration here, not sure why
+    calib_n = 0
+    # should only take 256 microseconds, but try a few times anyway
+    while True:
+      if calib_n == 3:
+        raise Exception("IF calibration did not complete.")
+      elif self.a7105.read_reg(Reg.CALIBRATION) & 0b001 == 0:
+        break
+      time.sleep(0.001)
+      calib_n += 1
+
+    # check calibration succeeded
+    if self.a7105.read_reg(Reg.IF_CALIBRATION_I) & 0b1000 != 0:
+      raise Exception("IF calibration failed.")
+    logging.debug('    calibration complete')
+
+  def calibrate_vco(self):
+    logging.debug('    calibrating VCO')
+    # reference code sets 0x24, 0x26 here, deviation skips
+
+    # select channel 0?
+    self.a7105.write_reg(Reg.PLL_I, 0x00)
+
+    # select VCO calibration
+    self.a7105.write_reg(Reg.CALIBRATION, 0b010)
+
+    calib_n = 0
+    while True:
+      if calib_n == 3:
+        raise Exception("VCO calibration did not complete.")
+      elif self.a7105.read_reg(Reg.CALIBRATION) & 0b010 == 0:
+        break
+      time.sleep(0.001)
+      calib_n += 1
+
+    # check calibration succeeded
+    if self.a7105.read_reg(Reg.VCO_CALIBRATION_I) & 0b1000 != 0:
+      raise Exception("VCO calibration failed.")
+    logging.debug('    calibration complete')
 
 logging.basicConfig(level = logging.DEBUG)
 

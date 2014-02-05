@@ -13,33 +13,41 @@ def debug_enum(enum):
 
 class Reg:
   # reset, etc
-  MODE         = 0x00
+  MODE              = 0x00
   # used to set transmitter options
-  MODE_CONTROL = 0x01
+  MODE_CONTROL      = 0x01
+  # used to select calibration mode
+  CALIBRATION       = 0x02
   # used to set the FIFO end pointer (FEP)
-  FIFO_1       = 0x03
+  FIFO_1            = 0x03
   # used to set transmitter ID
-  ID           = 0x06
+  ID                = 0x06
   # enables 4-wire SPI
-  GIO1S        = 0x0b
+  GIO1S             = 0x0b
   # clock settings
-  CLOCK        = 0x0d
+  CLOCK             = 0x0d
   # controls data rate division
-  DATA_RATE    = 0x0e
+  DATA_RATE         = 0x0e
+  # channel number select
+  PLL_I             = 0x0f
   # controls frequency deviation
-  TX_II        = 0x15
+  TX_II             = 0x15
   # controls receiver settings
-  RX           = 0x18
+  RX                = 0x18
   # more receiver settings
-  RX_GAIN_I    = 0x19
+  RX_GAIN_I         = 0x19
   # reserved constants
-  RX_GAIN_IV   = 0x1C
+  RX_GAIN_IV        = 0x1C
   # encoding settings
-  CODE_I       = 0x1F
+  CODE_I            = 0x1F
   # more encoding settings
-  CODE_II      = 0x20
+  CODE_II           = 0x20
+  # contains flag for checking IF calibration
+  IF_CALIBRATION_I  = 0x22
+  # contains flag for checking VCO calibration
+  VCO_CALIBRATION_I = 0x25
   # RX demodulator settings
-  RX_DEM_TEST  = 0x29
+  RX_DEM_TEST       = 0x29
 
 debug_reg = debug_enum(Reg)
 
@@ -86,7 +94,7 @@ class A7105:
     self.write_reg(Reg.GIO1S, ENABLE_4WIRE)
 
   def write_reg(self, reg, value):
-    logging.debug('writeReg(Reg.%s, %02x)' % ( debug_reg[reg], value ))
+    logging.debug('write_reg(Reg.%s, %02x)' % ( debug_reg[reg], value ))
     with self.cs_low:
       self.spi.Write(pack('BB', reg, value))
 
@@ -98,6 +106,7 @@ class A7105:
     with self.cs_low:
       self.spi.Write(pbyte(READ_BIT | reg))
       value = ubyte(self.spi.Read(1))
+    logging.debug('read_reg(Reg.%s) == %02x' % ( debug_reg[reg], value ) )
     return value
 
   # software reset
