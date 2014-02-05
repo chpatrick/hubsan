@@ -46,6 +46,8 @@ class Reg:
   IF_CALIBRATION_I  = 0x22
   # contains flag for checking VCO calibration
   VCO_CALIBRATION_I = 0x25
+  # TX power settings
+  TX_TEST           = 0x28
   # RX demodulator settings
   RX_DEM_TEST       = 0x29
 
@@ -62,6 +64,30 @@ class State:
   RESET_READ_POINTER  = 0xF0
 
 debug_state = debug_enum(State)
+
+class Power:
+  _100uW = 0
+  _300uW = 1
+  _1mW   = 2
+  _3mW   = 3
+  _10mW  = 4
+  _30mW  = 5
+  _100mW = 6
+  _150mW = 7
+
+debug_power = debug_enum(Power)
+
+# contains PAC and TBG values
+power_enums = {}
+
+power_enums[Power._100uW] = ( 0, 0 )
+power_enums[Power._300uW] = ( 0, 1 ) # datasheet recommended
+power_enums[Power._1mW]   = ( 0, 2 )
+power_enums[Power._3mW]   = ( 0, 4 )
+power_enums[Power._10mW]  = ( 1, 5 )
+power_enums[Power._30mW]  = ( 2, 7 ) # looks like a good value
+power_enums[Power._100mW] = ( 3, 7 ) # datasheet recommended
+power_enums[Power._150mW] = ( 3, 7 ) # datasheet recommended
 
 READ_BIT = 0x40 # flag bit specifying register should be read
 
@@ -124,11 +150,8 @@ class A7105:
     logging.debug('strobe(State.%s)' % ( debug_state[state] ))
     with self.cs_low:
       self.spi.Write(pbyte(state))
-'''
-a7105 = A7105()
-a7105.init()
-for r in xrange(256):
-  val = a7105.read_reg(r)
-  print r, val
-  time.sleep(0.05)
-'''
+
+  def set_power(self, power):
+    logging.debug('set_power(Power.%s)' % ( debug_power[power] ))
+    pac, tbg = power_enums[power]
+    self.write_reg(Reg.TX_TEST, (pac << 3) | tbg)

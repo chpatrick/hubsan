@@ -19,7 +19,17 @@ class Hubsan:
     self.a7105.strobe(State.STANDBY)
 
     self.calibrate_if()
-    self.calibrate_vco()
+    self.calibrate_vco(0x00)
+    self.calibrate_vco(0xa0)
+
+    # deviation code seems to set up GPIO pins here, looks device-specific
+    # we use GPIO1 for 4-wire SPI anyway
+
+    # seems like a reasonable power level
+    self.a7105.set_power(Power._30mW)
+
+    # not sure what this is for
+    self.a7105.strobe(State.STANDBY)
 
   def init_regs(self):
     a = self.a7105
@@ -73,12 +83,11 @@ class Hubsan:
       raise Exception("IF calibration failed.")
     logging.debug('    calibration complete')
 
-  def calibrate_vco(self):
-    logging.debug('    calibrating VCO')
+  def calibrate_vco(self, channel):
+    logging.debug('    calibrating VCO channel %02x' % (channel))
     # reference code sets 0x24, 0x26 here, deviation skips
 
-    # select channel 0?
-    self.a7105.write_reg(Reg.PLL_I, 0x00)
+    self.a7105.write_reg(Reg.PLL_I, channel)
 
     # select VCO calibration
     self.a7105.write_reg(Reg.CALIBRATION, 0b010)
