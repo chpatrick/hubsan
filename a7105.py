@@ -1,11 +1,37 @@
 from mpsse import *
 import time
 from struct import *
+import logging
 
 class Reg:
-  MODE  = 0x00 # reset, etc
-  ID    = 0x06 # used to set transmitter ID
-  GIO1S = 0x0b # enables 4-wire SPI
+  # reset, etc
+  MODE         = 0x00
+  # used to set transmitter options
+  MODE_CONTROL = 0x01
+  # used to set the FIFO end pointer (FEP)
+  FIFO_1       = 0x03
+  # used to set transmitter ID
+  ID           = 0x06
+  # enables 4-wire SPI
+  GIO1S        = 0x0b
+  # clock settings
+  CLOCK        = 0x0d
+  # controls data rate division
+  DATA_RATE    = 0x0e
+  # controls frequency deviation
+  TX_II        = 0x15
+  # controls receiver settings
+  RX           = 0x18
+  # more receiver settings
+  RX_GAIN_I    = 0x19
+  # reserved constants
+  RX_GAIN_IV   = 0x1C
+  # encoding settings
+  CODE_I       = 0x1F
+  # more encoding settings
+  CODE_II      = 0x20
+  # RX demodulator settings
+  RX_DEM_TEST  = 0x29
 
 READ_BIT = 0x40 # flag bit specifying register should be read
 
@@ -41,6 +67,8 @@ class A7105:
     with self.spi_on:
       self.spi.Write(pack('BB', reg, value))
 
+    logging.debug('writeReg(%02x, %02x)' % ( reg, value ))
+
   def read_reg(self, reg):
     value = None
     with self.spi_on:
@@ -54,11 +82,11 @@ class A7105:
   def write_id(self, id):
     with self.spi_on:
       self.spi.Write(pbyte(Reg.ID) + id)
-
+'''
 a7105 = A7105()
 a7105.init()
-time.sleep(1)
 for r in xrange(256):
   val = a7105.read_reg(r)
-  print r, bin(val)
+  print r, val
   time.sleep(0.05)
+'''
