@@ -1,14 +1,33 @@
 from a7105 import *
 import time
 import logging
+import random
+import struct
+
+def calc_checksum(packet):
+  total = 0
+  for char in packet:
+    total += struct.unpack('B', char)[0]
+  return (256 - (total % 256)) & 0xff
 
 class Hubsan:
   # not sure if byte order is correct
   ID = '\x55\x20\x10\x41'
   CALIBRATION_MAX_CHECKS = 3
+  # channels we can use, magic numbers from deviation
+  ALLOWED_CHANNELS = [ 0x14, 0x1e, 0x28, 0x32, 0x3c, 0x46, 0x50, 0x5a, 0x64, 0x6e, 0x78, 0x82 ]
+  # mystery packet constants
+  MYSTERY_CONSTANTS = '\x08\xe4\xea\x9e\x50'
+  # mystery ID from deviation
+  TX_ID = '\xdb\x04\x26\x79'
 
   def __init__(self):
     self.a7105 = A7105()
+
+    # generate a random session ID
+    self.session_id = struct.pack('BBBB', *(random.randint(0, 255) for n in xrange(4)))
+    # choose a random channel
+    self.channel, = random.sample(Hubsan.ALLOWED_CHANNELS, 1)
 
   def init(self):
     self.a7105.init()
@@ -106,7 +125,11 @@ class Hubsan:
       raise Exception("VCO calibration failed.")
     logging.debug('    calibration complete')
 
-logging.basicConfig(level = logging.DEBUG)
 
-hubsan = Hubsan()
-hubsan.init()
+  def build_bind_packet(self, state):
+    packet = struct.pack('BB', state, self.channel) + self.session_id + Hubsan.MYSTERY_CONSTANTS + Hubsan.TX_ID
+    packet += pbyte(calc_checksum(packet))
+
+    return packet
+
+logging.basicConfig(level = logging.DEBUG)
