@@ -3,6 +3,14 @@ import time
 from struct import *
 import logging
 
+# generate inverse mapping from 'enum' class, for debugging
+def debug_enum(enum):
+  debug = {}
+  for k, v in enum.__dict__.items():
+    if type(v) is int:
+      debug[v] = k
+  return debug
+
 class Reg:
   # reset, etc
   MODE         = 0x00
@@ -33,6 +41,8 @@ class Reg:
   # RX demodulator settings
   RX_DEM_TEST  = 0x29
 
+debug_reg = debug_enum(Reg)
+
 class State:
   SLEEP               = 0x80
   IDLE                = 0x90
@@ -42,6 +52,8 @@ class State:
   TX                  = 0xD0
   RESET_WRITE_POINTER = 0xE0
   RESET_READ_POINTER  = 0xF0
+
+debug_state = debug_enum(State)
 
 READ_BIT = 0x40 # flag bit specifying register should be read
 
@@ -74,10 +86,12 @@ class A7105:
     self.write_reg(Reg.GIO1S, ENABLE_4WIRE)
 
   def write_reg(self, reg, value):
+    logging.debug('writeReg(Reg.%s, %02x)' % ( debug_reg[reg], value ))
     with self.cs_low:
       self.spi.Write(pack('BB', reg, value))
 
-    logging.debug('writeReg(%02x, %02x)' % ( reg, value ))
+    # read_value = self.read_reg(reg)
+    # logging.debug('read back %02x' % ( read_value ))
 
   def read_reg(self, reg):
     value = None
@@ -86,6 +100,8 @@ class A7105:
       value = ubyte(self.spi.Read(1))
     return value
 
+  # software reset
+  # seems to make the A7105 unresponsive :/
   def reset(self):
     self.write_reg(Reg.MODE, 0x00)
 
@@ -96,6 +112,7 @@ class A7105:
   def strobe(self, state):
     # A7105 datasheet says SCS should be high after only 4 bits,
     # but deviation doesn't bother
+    logging.debug('strobe(State.%s)' % ( debug_state[state] ))
     with self.cs_low:
       self.spi.Write(pbyte(state))
 '''
