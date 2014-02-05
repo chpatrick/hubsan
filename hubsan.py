@@ -10,6 +10,8 @@ def calc_checksum(packet):
     total += struct.unpack('B', char)[0]
   return (256 - (total % 256)) & 0xff
 
+log = logging.getLogger('hubsan')
+
 class Hubsan:
   # not sure if byte order is correct
   ID = '\x55\x20\x10\x41'
@@ -53,7 +55,11 @@ class Hubsan:
   def init_regs(self):
     a = self.a7105
 
-    logging.debug('    initializing registers`')
+    a.reset()
+
+    time.sleep(3)
+
+    log.debug('initializing registers')
     a.write_id(Hubsan.ID)
     # set various radio options
     a.write_reg(Reg.MODE_CONTROL, 0x63)
@@ -81,7 +87,7 @@ class Hubsan:
 
   # WTF: these seem to differ from the A7105 spec, this is the deviation version
   def calibrate_if(self):
-    logging.debug('    calibrating IF bank')
+    log.debug('calibrating IF bank')
 
     # select IF calibration
     self.a7105.write_reg(Reg.CALIBRATION, 0b001)
@@ -100,10 +106,10 @@ class Hubsan:
     # check calibration succeeded
     if self.a7105.read_reg(Reg.IF_CALIBRATION_I) & 0b1000 != 0:
       raise Exception("IF calibration failed.")
-    logging.debug('    calibration complete')
+    log.debug('calibration complete')
 
   def calibrate_vco(self, channel):
-    logging.debug('    calibrating VCO channel %02x' % (channel))
+    log.debug('calibrating VCO channel %02x' % (channel))
     # reference code sets 0x24, 0x26 here, deviation skips
 
     self.a7105.write_reg(Reg.PLL_I, channel)
@@ -111,25 +117,46 @@ class Hubsan:
     # select VCO calibration
     self.a7105.write_reg(Reg.CALIBRATION, 0b010)
 
-    calib_n = 0
-    while True:
+    for calib_n in xrange(4):
       if calib_n == 3:
         raise Exception("VCO calibration did not complete.")
       elif self.a7105.read_reg(Reg.CALIBRATION) & 0b010 == 0:
         break
       time.sleep(0.001)
-      calib_n += 1
 
     # check calibration succeeded
     if self.a7105.read_reg(Reg.VCO_CALIBRATION_I) & 0b1000 != 0:
       raise Exception("VCO calibration failed.")
-    logging.debug('    calibration complete')
+    log.debug('calibration complete')
 
 
   def build_bind_packet(self, state):
     packet = struct.pack('BB', state, self.channel) + self.session_id + Hubsan.MYSTERY_CONSTANTS + Hubsan.TX_ID
-    packet += pbyte(calc_checksum(packet))
 
-    return packet
+    return packet + pbyte(calc_checksum(packet))
+
+  def send_packet(self, packet):
+    log.debug('sending ')
+    self.a7105.strobe(State.STANDBY)
+    self.a7105.write_data(packet, self.channel)
+    time.sleep(0.003)
+
+    # wait for send to complete
+    for send_n in xrange(4):
+      if send_n == 3:
+        raise Exception("Sending did not complete.")
+      elif self.a7105.read_reg(Reg.MODE) & 1 == 0:
+        break
+      time.sleep(0.001)
+
+  def bind(self):
+    a = self.a7105
+
+    packet = self.build_bind_packet(1)
+    self.send_packet(packet)
 
 logging.basicConfig(level = logging.DEBUG)
+
+hubsan = Hubsan()
+hubsan.init()
+hubsan.bind()

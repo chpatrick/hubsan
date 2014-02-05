@@ -93,6 +93,8 @@ READ_BIT = 0x40 # flag bit specifying register should be read
 
 ENABLE_4WIRE = 0x19 # value written to GIO1S to enable 4-wire SPI
 
+FIFO_START = 0x05
+
 # context guard for SPI
 class SPIContext:
   def __init__(self, spi):
@@ -113,6 +115,11 @@ def pbyte(byte):
 def ubyte(bytestring):
   return unpack('B', bytestring)[0]
 
+def format_packet(packet):
+  return ' '.join('%02x' % ubyte(byte) for byte in packet)
+
+log = logging.getLogger('a7105')
+
 class A7105:
   def init(self):
     self.spi = MPSSE(SPI0, TEN_MHZ, MSB)
@@ -120,25 +127,28 @@ class A7105:
     self.write_reg(Reg.GIO1S, ENABLE_4WIRE)
 
   def write_reg(self, reg, value):
-    logging.debug('write_reg(Reg.%s, %02x)' % ( debug_reg[reg], value ))
+    log.debug('write_reg({0}, {1:02x} == {2:08b})'.format( debug_reg[reg], value, value ))
     with self.cs_low:
       self.spi.Write(pack('BB', reg, value))
 
     # read_value = self.read_reg(reg)
-    # logging.debug('read back %02x' % ( read_value ))
+    # log.debug('read back %02x' % ( read_value ))
 
   def read_reg(self, reg):
     value = None
     with self.cs_low:
       self.spi.Write(pbyte(READ_BIT | reg))
       value = ubyte(self.spi.Read(1))
-    logging.debug('read_reg(Reg.%s) == %02x' % ( debug_reg[reg], value ) )
+    log.debug('read_reg({0}) == {1:02x} == {2:08b}'.format( debug_reg[reg], value, value ) )
     return value
 
   # software reset
   # seems to make the A7105 unresponsive :/
   def reset(self):
+    log.debug('reset()')
     self.write_reg(Reg.MODE, 0x00)
+    # enable 4-wire again
+    self.write_reg(Reg.GIO1S, ENABLE_4WIRE)
 
   def write_id(self, id):
     with self.cs_low:
@@ -147,11 +157,35 @@ class A7105:
   def strobe(self, state):
     # A7105 datasheet says SCS should be high after only 4 bits,
     # but deviation doesn't bother
-    logging.debug('strobe(State.%s)' % ( debug_state[state] ))
+    log.debug('strobe(%s)' % debug_state[state])
     with self.cs_low:
       self.spi.Write(pbyte(state))
 
   def set_power(self, power):
-    logging.debug('set_power(Power.%s)' % ( debug_power[power] ))
+    log.debug('set_power(%s)' % debug_power[power])
     pac, tbg = power_enums[power]
     self.write_reg(Reg.TX_TEST, (pac << 3) | tbg)
+
+  def write_data(self, packet, channel):
+    log.debug('write_data(%s, %02x)' % ( format_packet(packet), channel ))
+    # deviation does this all under one SPI session, I think it should be fine
+    self.strobe(State.RESET_WRITE_POINTER)
+    with self.cs_low:
+      self.spi.Write(pbyte(FIFO_START) + packet)
+
+    # select the channel
+    # WTF: do we need to do this here?
+    self.write_reg(Reg.PLL_I, channel)
+
+    # transmit the data
+    self.strobe(State.TX)
+
+  def read_data(self, length):
+    self.strobe(State.RESET_READ_POINTER)
+    packet = None
+    with self.cs_low:
+      self.spi.Write(pbyte(READ_BIT | FIFO_START))
+      packet = self.spi.Read(length)
+
+    # transmit the data
+    self.strobe(State.TX)
