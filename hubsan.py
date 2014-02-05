@@ -37,6 +37,9 @@ class Hubsan:
     # set constants
     a.write_reg(Reg.RX_DEM_TEST, 0x47)
 
+    # go into Standby mode
+    a.strobe(State.STANDBY)
+
 logging.basicConfig(level = logging.DEBUG)
 
 hubsan = Hubsan()

@@ -33,6 +33,16 @@ class Reg:
   # RX demodulator settings
   RX_DEM_TEST  = 0x29
 
+class State:
+  SLEEP               = 0x80
+  IDLE                = 0x90
+  STANDBY             = 0xA0
+  PLL                 = 0xB0
+  RX                  = 0xC0
+  TX                  = 0xD0
+  RESET_WRITE_POINTER = 0xE0
+  RESET_READ_POINTER  = 0xF0
+
 READ_BIT = 0x40 # flag bit specifying register should be read
 
 ENABLE_4WIRE = 0x19 # value written to GIO1S to enable 4-wire SPI
@@ -60,18 +70,18 @@ def ubyte(bytestring):
 class A7105:
   def init(self):
     self.spi = MPSSE(SPI0, TEN_MHZ, MSB)
-    self.spi_on = SPIContext(self.spi)
+    self.cs_low = SPIContext(self.spi)
     self.write_reg(Reg.GIO1S, ENABLE_4WIRE)
 
   def write_reg(self, reg, value):
-    with self.spi_on:
+    with self.cs_low:
       self.spi.Write(pack('BB', reg, value))
 
     logging.debug('writeReg(%02x, %02x)' % ( reg, value ))
 
   def read_reg(self, reg):
     value = None
-    with self.spi_on:
+    with self.cs_low:
       self.spi.Write(pbyte(READ_BIT | reg))
       value = ubyte(self.spi.Read(1))
     return value
@@ -80,8 +90,14 @@ class A7105:
     self.write_reg(Reg.MODE, 0x00)
 
   def write_id(self, id):
-    with self.spi_on:
+    with self.cs_low:
       self.spi.Write(pbyte(Reg.ID) + id)
+
+  def strobe(self, state):
+    # A7105 datasheet says SCS should be high after only 4 bits,
+    # but deviation doesn't bother
+    with self.cs_low:
+      self.spi.Write(pbyte(state))
 '''
 a7105 = A7105()
 a7105.init()
