@@ -22,7 +22,7 @@ class Hubsan:
   # channels we can use, magic numbers from deviation
   ALLOWED_CHANNELS = [ 0x14, 0x1e, 0x28, 0x32, 0x3c, 0x46, 0x50, 0x5a, 0x64, 0x6e, 0x78, 0x82 ]
   # mystery packet constants
-  MYSTERY_CONSTANTS = '\x08\xe5\xea\x9e\x50' # does respond without this?
+  MYSTERY_CONSTANTS = '\x08\xe4\xea\x9e\x50' # does respond without this?
   # mystery ID from deviation
   TX_ID = '\xdb\x04\x26\x79' # also reacts without this
 
@@ -142,7 +142,6 @@ class Hubsan:
     return packet + pbyte(calc_checksum(packet))
 
   def send_packet(self, packet):
-    log.debug('sending ')
     self.a7105.strobe(State.STANDBY)
     self.a7105.write_data(packet, self.channel)
     #time.sleep(0.003)
@@ -165,21 +164,39 @@ class Hubsan:
     a.strobe(State.RX)
     # time.sleep(0.00045)
 
-    for recv_n in xrange(10):
+    for recv_n in xrange(100):
       if a.read_reg(Reg.MODE) & 1 == 0:
         return a.read_data(16)
 
     raise BindError()
 
   def bind(self):
+    state4_response = None
+
     while True:
       try:
         self.bind_stage(1)
-        self.bind_stage(3)
+        #time.sleep(0.008)
+        state4_response = self.bind_stage(3)
+        #self.a7105.write_id(state4_response[2:6])
+        self.a7105.write_id(state4_response[2:6])
+        #time.sleep(0.008)
+        self.bind_stage(1)
+        #time.sleep(0.008)
+
         break
       except BindError:
         continue
-logging.basicConfig(level = logging.DEBUG)
+
+    while True:
+      try:
+        phase2_response = self.bind_stage(9)
+        if phase2_response[1] == '\x09':
+          return
+      except BindError:
+        continue
+
+logging.basicConfig(level = logging.INFO)
 
 hubsan = Hubsan()
 hubsan.init()

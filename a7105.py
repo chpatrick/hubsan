@@ -151,6 +151,7 @@ class A7105:
     self.write_reg(Reg.GIO1S, ENABLE_4WIRE)
 
   def write_id(self, id):
+    log.debug('write_id(%s)' % format_packet(id))
     with self.cs_low:
       self.spi.Write(pbyte(Reg.ID) + id)
 
