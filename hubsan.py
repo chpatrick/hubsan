@@ -14,34 +14,38 @@ log = logging.getLogger('hubsan')
 
 class Hubsan:
   # not sure if byte order is correct
-  ID = '\x55\x20\x10\x41'
+  ID = '\x55\x20\x10\x41' # doesn't respond without this
   CALIBRATION_MAX_CHECKS = 3
   # channels we can use, magic numbers from deviation
   ALLOWED_CHANNELS = [ 0x14, 0x1e, 0x28, 0x32, 0x3c, 0x46, 0x50, 0x5a, 0x64, 0x6e, 0x78, 0x82 ]
   # mystery packet constants
-  MYSTERY_CONSTANTS = '\x08\xe4\xea\x9e\x50'
+  MYSTERY_CONSTANTS = '\x08\xe5\xea\x9e\x50' # does respond without this?
   # mystery ID from deviation
-  TX_ID = '\xdb\x04\x26\x79'
+  TX_ID = '\xdb\x04\x26\x79' # also reacts without this
 
   def __init__(self):
     self.a7105 = A7105()
 
     # generate a random session ID
-    self.session_id = struct.pack('BBBB', *(random.randint(0, 255) for n in xrange(4)))
+    # self.session_id = struct.pack('BBBB', *(random.randint(0, 255) for n in xrange(4)))
+    self.session_id = '\x2c\xb5\xda\xb3'
     # choose a random channel
-    self.channel, = random.sample(Hubsan.ALLOWED_CHANNELS, 1)
+    #self.channel, = random.sample(Hubsan.ALLOWED_CHANNELS, 1)
+    self.channel = 0x3c
 
   def init(self):
     self.a7105.init()
 
     self.init_regs()
 
-    # go into Standby mode
-    self.a7105.strobe(State.STANDBY)
+    # go into PLL mode like the datasheet saysk
+    # self.a7105.strobe(State.PLL)
 
     self.calibrate_if()
     self.calibrate_vco(0x00)
     self.calibrate_vco(0xa0)
+
+    self.a7105.strobe(State.STANDBY)
 
     # deviation code seems to set up GPIO pins here, looks device-specific
     # we use GPIO1 for 4-wire SPI anyway
@@ -131,6 +135,7 @@ class Hubsan:
 
 
   def build_bind_packet(self, state):
+    #packet = struct.pack('BB', state, self.channel) + self.session_id + Hubsan.MYSTERY_CONSTANTS + Hubsan.TX_ID
     packet = struct.pack('BB', state, self.channel) + self.session_id + Hubsan.MYSTERY_CONSTANTS + Hubsan.TX_ID
 
     return packet + pbyte(calc_checksum(packet))
@@ -139,7 +144,7 @@ class Hubsan:
     log.debug('sending ')
     self.a7105.strobe(State.STANDBY)
     self.a7105.write_data(packet, self.channel)
-    time.sleep(0.003)
+    #time.sleep(0.003)
 
     # wait for send to complete
     for send_n in xrange(4):
@@ -153,12 +158,30 @@ class Hubsan:
     a = self.a7105
 
     packet = self.build_bind_packet(1)
-    self.send_packet(packet)
 
-    a.strobe(State.RX)
-    if a.read_reg(Reg.MODE) & 1 == 1:
-      raise Exception("No signal :(")
+    while True:
+      self.send_packet(packet)
+
+
+      a.strobe(State.RX)
+      # time.sleep(0.00045)
+
+      for recv_n in xrange(10):
+        if recv_n == 9:
+          break
+        if a.read_reg(Reg.MODE) & 1 == 0:
+          response = a.read_data(16)
+          print format_packet(response)
+          raw_input()
+          break
+      #if any(byte != '\x00' for byte in response):
+      #  break
+
+      # no signal...
+      time.sleep(0.012)
+      #raw_input()
     packet = a.read_data(16)
+    log.debug('state 2!')
 
 
 logging.basicConfig(level = logging.DEBUG)
