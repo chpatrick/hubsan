@@ -12,6 +12,9 @@ def calc_checksum(packet):
 
 log = logging.getLogger('hubsan')
 
+class BindError(Exception):
+  pass
+
 class Hubsan:
   # not sure if byte order is correct
   ID = '\x55\x20\x10\x41' # doesn't respond without this
@@ -27,11 +30,10 @@ class Hubsan:
     self.a7105 = A7105()
 
     # generate a random session ID
-    # self.session_id = struct.pack('BBBB', *(random.randint(0, 255) for n in xrange(4)))
-    self.session_id = '\x2c\xb5\xda\xb3'
+    self.session_id = struct.pack('BBBB', *(random.randint(0, 255) for n in xrange(4)))
+
     # choose a random channel
-    #self.channel, = random.sample(Hubsan.ALLOWED_CHANNELS, 1)
-    self.channel = 0x3c
+    self.channel, = random.sample(Hubsan.ALLOWED_CHANNELS, 1)
 
   def init(self):
     self.a7105.init()
@@ -135,7 +137,6 @@ class Hubsan:
 
 
   def build_bind_packet(self, state):
-    #packet = struct.pack('BB', state, self.channel) + self.session_id + Hubsan.MYSTERY_CONSTANTS + Hubsan.TX_ID
     packet = struct.pack('BB', state, self.channel) + self.session_id + Hubsan.MYSTERY_CONSTANTS + Hubsan.TX_ID
 
     return packet + pbyte(calc_checksum(packet))
@@ -154,38 +155,33 @@ class Hubsan:
         break
       time.sleep(0.001)
 
-  def bind(self):
+  def bind_stage(self, state):
     a = self.a7105
 
-    packet = self.build_bind_packet(1)
+    packet = self.build_bind_packet(state)
 
+    self.send_packet(packet)
+
+    a.strobe(State.RX)
+    # time.sleep(0.00045)
+
+    for recv_n in xrange(10):
+      if a.read_reg(Reg.MODE) & 1 == 0:
+        return a.read_data(16)
+
+    raise BindError()
+
+  def bind(self):
     while True:
-      self.send_packet(packet)
-
-
-      a.strobe(State.RX)
-      # time.sleep(0.00045)
-
-      for recv_n in xrange(10):
-        if recv_n == 9:
-          break
-        if a.read_reg(Reg.MODE) & 1 == 0:
-          response = a.read_data(16)
-          print format_packet(response)
-          raw_input()
-          break
-      #if any(byte != '\x00' for byte in response):
-      #  break
-
-      # no signal...
-      time.sleep(0.012)
-      #raw_input()
-    packet = a.read_data(16)
-    log.debug('state 2!')
-
-
+      try:
+        self.bind_stage(1)
+        self.bind_stage(3)
+        break
+      except BindError:
+        continue
 logging.basicConfig(level = logging.DEBUG)
 
 hubsan = Hubsan()
 hubsan.init()
 hubsan.bind()
+
