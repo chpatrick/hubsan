@@ -186,6 +186,7 @@ class A7105:
     with self.cs_low:
       self.spi.Write(pbyte(READ_BIT | FIFO_START))
       packet = self.spi.Read(length)
+    
+    log.debug('read_data(%d) == %s' % ( length, format_packet(packet) ))
 
-    # transmit the data
-    self.strobe(State.TX)
+    return packet

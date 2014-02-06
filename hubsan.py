@@ -155,6 +155,12 @@ class Hubsan:
     packet = self.build_bind_packet(1)
     self.send_packet(packet)
 
+    a.strobe(State.RX)
+    if a.read_reg(Reg.MODE) & 1 == 1:
+      raise Exception("No signal :(")
+    packet = a.read_data(16)
+
+
 logging.basicConfig(level = logging.DEBUG)
 
 hubsan = Hubsan()
