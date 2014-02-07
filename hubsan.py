@@ -168,8 +168,9 @@ class Hubsan:
 
     for recv_n in xrange(100):
       if a.read_reg(Reg.MODE) & 1 == 0:
-        log.info('got response: ' + format_packet(self.a7105.read_data(16)))
-        return a.read_data(16)
+        packet = a.read_data(16)
+        log.info('got response: ' + format_packet(packet))
+        return packet
 
     raise BindError()
 
