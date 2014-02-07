@@ -65,7 +65,7 @@ class Hubsan:
 
     time.sleep(3)
 
-    log.debug('initializing registers')
+    log.info('initializing registers')
     a.write_id(Hubsan.ID)
     # set various radio options
     a.write_reg(Reg.MODE_CONTROL, 0x63)
@@ -93,7 +93,7 @@ class Hubsan:
 
   # WTF: these seem to differ from the A7105 spec, this is the deviation version
   def calibrate_if(self):
-    log.debug('calibrating IF bank')
+    log.info('calibrating IF bank')
 
     # select IF calibration
     self.a7105.write_reg(Reg.CALIBRATION, 0b001)
@@ -112,10 +112,10 @@ class Hubsan:
     # check calibration succeeded
     if self.a7105.read_reg(Reg.IF_CALIBRATION_I) & 0b1000 != 0:
       raise Exception("IF calibration failed.")
-    log.debug('calibration complete')
+    log.info('calibration complete')
 
   def calibrate_vco(self, channel):
-    log.debug('calibrating VCO channel %02x' % (channel))
+    log.info('calibrating VCO channel %02x' % (channel))
     # reference code sets 0x24, 0x26 here, deviation skips
 
     self.a7105.write_reg(Reg.PLL_I, channel)
@@ -133,7 +133,7 @@ class Hubsan:
     # check calibration succeeded
     if self.a7105.read_reg(Reg.VCO_CALIBRATION_I) & 0b1000 != 0:
       raise Exception("VCO calibration failed.")
-    log.debug('calibration complete')
+    log.info('calibration complete')
 
 
   def build_bind_packet(self, state):
@@ -141,9 +141,9 @@ class Hubsan:
 
     return packet + pbyte(calc_checksum(packet))
 
-  def send_packet(self, packet):
+  def send_packet(self, packet, channel):
     self.a7105.strobe(State.STANDBY)
-    self.a7105.write_data(packet, self.channel)
+    self.a7105.write_data(packet, channel)
     #time.sleep(0.003)
 
     # wait for send to complete
@@ -155,23 +155,26 @@ class Hubsan:
       time.sleep(0.001)
 
   def bind_stage(self, state):
+    log.info('bind stage %d' % state)
+
     a = self.a7105
 
     packet = self.build_bind_packet(state)
 
-    self.send_packet(packet)
+    self.send_packet(packet, self.channel)
 
     a.strobe(State.RX)
     # time.sleep(0.00045)
 
     for recv_n in xrange(100):
       if a.read_reg(Reg.MODE) & 1 == 0:
+        log.info('got response: ' + format_packet(self.a7105.read_data(16)))
         return a.read_data(16)
 
     raise BindError()
 
   def bind(self):
-    state4_response = None
+    log.info('binding started')
 
     while True:
       try:
@@ -192,13 +195,39 @@ class Hubsan:
       try:
         phase2_response = self.bind_stage(9)
         if phase2_response[1] == '\x09':
-          return
+          break
       except BindError:
         continue
+
+    # enable CRC, id code length 4, preamble length 4
+    self.a7105.write_reg(Reg.CODE_I, 0x0F)
+
+    log.info('bind complete!')
+
+  def control(self, throttle, rudder, elevator, aileron):
+    control_packet = '\x20'
+    for chan in [ throttle, rudder, elevator, aileron ]:
+      control_packet += '\x00' + pbyte(chan)
+    control_packet += '\x02\x64' + Hubsan.TX_ID
+    control_packet += pbyte(calc_checksum(control_packet))
+
+    log.info('sending control packet: %s' % format_packet(control_packet))
+
+    for i in xrange(4):
+      #self.send_packet(control_packet, self.channel)
+      self.a7105.strobe(State.STANDBY)
+      self.a7105.write_data(control_packet, self.channel)
+      time.sleep(0.03)
+    #self.send_packet(control_packet, self.channel + 0x23)
+    self.a7105.strobe(State.STANDBY)
+    self.a7105.write_data(control_packet, self.channel + 0x23)
+    time.sleep(0.03)
 
 logging.basicConfig(level = logging.INFO)
 
 hubsan = Hubsan()
 hubsan.init()
 hubsan.bind()
-
+time.sleep(2)
+while True:
+  hubsan.control(0xc0, 0x80, 0x7d, 0x84)
