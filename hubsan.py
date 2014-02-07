@@ -223,12 +223,3 @@ class Hubsan:
     self.a7105.strobe(State.STANDBY)
     self.a7105.write_data(control_packet, self.channel + 0x23)
     time.sleep(0.03)
-
-logging.basicConfig(level = logging.INFO)
-
-hubsan = Hubsan()
-hubsan.init()
-hubsan.bind()
-time.sleep(2)
-while True:
-  hubsan.control(0xc0, 0x80, 0x7d, 0x84)
