@@ -17,21 +17,7 @@ logging.basicConfig(level = logging.INFO)
 hubsan = Hubsan()
 hubsan.init()
 hubsan.bind()
-time.sleep(2)
 hubsan.safety()
-
-print "starting"
-
-def map_axis(joystick, axis, input_min, input_max, output_min, output_max, default = 0.5):
-  axis_val = joystick.get_axis(axis)
-
-  output = None
-  if input_min <= axis_val <= input_max or input_max <= axis_val <= input_min:
-    output = (axis_val - input_min) / (input_max - input_min)
-  else:
-    output = default
-
-  return output_min + output * (output_max - output_min)
 
 while True:
   pygame.event.get()

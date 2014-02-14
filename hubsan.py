@@ -107,6 +107,7 @@ class Hubsan:
     # enable CRC, id code length 4, preamble length 4
     self.a7105.write_reg(Reg.CODE_I, 0x0F)
 
+    time.sleep(0.5) # wait a little bit until we can send control signals
     log.info('bind complete!')
 
   def control_raw(self, throttle, rudder, elevator, aileron):

@@ -125,7 +125,6 @@ class A7105:
     self.spi = MPSSE(SPI0, TEN_MHZ, MSB)
     self.cs_low = SPIContext(self.spi)
 
-    time.sleep(3) # not sure if needed
     self.reset()
 
     self.write_reg(Reg.GIO1S, ENABLE_4WIRE)
