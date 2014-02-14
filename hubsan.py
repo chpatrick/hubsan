@@ -43,11 +43,6 @@ class Hubsan:
 
     self.a7105.write_id(Hubsan.ID)
 
-  def build_bind_packet(self, state):
-    packet = struct.pack('BB', state, self.channel) + self.session_id + Hubsan.MYSTERY_CONSTANTS + Hubsan.TX_ID
-
-    return packet + pbyte(calc_checksum(packet))
-
   def send_packet(self, packet, channel):
     self.a7105.strobe(State.STANDBY)
     self.a7105.write_data(packet, channel)
@@ -64,18 +59,20 @@ class Hubsan:
   def bind_stage(self, state):
     log.debug('bind stage %d' % state)
 
-    a = self.a7105
-
-    packet = self.build_bind_packet(state)
+    packet = struct.pack('BB', state, self.channel)
+    packet += self.session_id
+    packet += Hubsan.MYSTERY_CONSTANTS
+    packet += Hubsan.TX_ID
+    packet += pbyte(calc_checksum(packet))
 
     self.send_packet(packet, self.channel)
 
-    a.strobe(State.RX)
+    self.a7105.strobe(State.RX)
     # time.sleep(0.00045)
 
     for recv_n in xrange(100):
-      if a.read_reg(Reg.MODE) & 1 == 0:
-        packet = a.read_data(16)
+      if self.a7105.read_reg(Reg.MODE) & 1 == 0:
+        packet = self.a7105.read_data(16)
         log.debug('got response: ' + format_packet(packet))
         return packet
 
