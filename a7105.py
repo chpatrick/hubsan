@@ -124,7 +124,102 @@ class A7105:
   def init(self):
     self.spi = MPSSE(SPI0, TEN_MHZ, MSB)
     self.cs_low = SPIContext(self.spi)
+
+    time.sleep(3) # not sure if needed
+    self.reset()
+
     self.write_reg(Reg.GIO1S, ENABLE_4WIRE)
+
+    self.init_regs()
+
+    # go into PLL mode like the datasheet saysk
+    # self.strobe(State.PLL)
+
+    self.calibrate_if()
+    self.calibrate_vco(0x00)
+    self.calibrate_vco(0xa0)
+
+    self.strobe(State.STANDBY)
+
+    # deviation code seems to set up GPIO pins here, looks device-specific
+    # we use GPIO1 for 4-wire SPI anyway
+
+    # seems like a reasonable power level
+    self.set_power(Power._30mW)
+
+    # not sure what this is for
+    self.strobe(State.STANDBY)
+
+  def init_regs(self):
+    log.debug('initializing registers')
+
+    # set various radio options
+    self.write_reg(Reg.MODE_CONTROL, 0x63)
+    # set packet length (FIFO end pointer) to 0x0f + 1 == 16
+    self.write_reg(Reg.FIFO_1, 0x0f)
+    # select crystal oscillator and system clock divider of 1/2
+    self.write_reg(Reg.CLOCK, 0x05)
+    # set data rate division to Fsyck / 32 / 5
+    self.write_reg(Reg.DATA_RATE, 0x04)
+    # set Fpfd to 32 MHz
+    self.write_reg(Reg.TX_II, 0x2b)
+    # select BPF bandwidth of 500 KHz and up side band
+    self.write_reg(Reg.RX, 0x62)
+    # enable manual VGA calibration
+    self.write_reg(Reg.RX_GAIN_I, 0x80)
+    # set some reserved constants
+    self.write_reg(Reg.RX_GAIN_IV, 0x0A)
+    # select ID code length of 4, preamble length of 4
+    self.write_reg(Reg.CODE_I, 0x07)
+    # set demodulator DC estimation average mode,
+    # ID code error tolerance = 1 bit, 16 bit preamble pattern detection length
+    self.write_reg(Reg.CODE_II, 0x17)
+    # set constants
+    self.write_reg(Reg.RX_DEM_TEST, 0x47)
+
+  # WTF: these seem to differ from the A7105 spec, this is the deviation version
+  def calibrate_if(self):
+    log.debug('calibrating IF bank')
+
+    # select IF calibration
+    self.write_reg(Reg.CALIBRATION, 0b001)
+
+    # WTF: deviation reads calibration here, not sure why
+    calib_n = 0
+    # should only take 256 microseconds, but try a few times anyway
+    while True:
+      if calib_n == 3:
+        raise Exception("IF calibration did not complete.")
+      elif self.read_reg(Reg.CALIBRATION) & 0b001 == 0:
+        break
+      time.sleep(0.001)
+      calib_n += 1
+
+    # check calibration succeeded
+    if self.read_reg(Reg.IF_CALIBRATION_I) & 0b1000 != 0:
+      raise Exception("IF calibration failed.")
+    log.debug('calibration complete')
+
+  def calibrate_vco(self, channel):
+    log.debug('calibrating VCO channel %02x' % (channel))
+    # reference code sets 0x24, 0x26 here, deviation skips
+
+    self.write_reg(Reg.PLL_I, channel)
+
+    # select VCO calibration
+    self.write_reg(Reg.CALIBRATION, 0b010)
+
+    for calib_n in xrange(4):
+      if calib_n == 3:
+        raise Exception("VCO calibration did not complete.")
+      elif self.read_reg(Reg.CALIBRATION) & 0b010 == 0:
+        break
+      time.sleep(0.001)
+
+    # check calibration succeeded
+    if self.read_reg(Reg.VCO_CALIBRATION_I) & 0b1000 != 0:
+      raise Exception("VCO calibration failed.")
+    log.debug('calibration complete')
 
   def write_reg(self, reg, value):
     log.debug('write_reg({0}, {1:02x} == {2:08b})'.format( debug_reg[reg], value, value ))
