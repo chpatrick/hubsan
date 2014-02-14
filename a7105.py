@@ -158,6 +158,9 @@ class A7105:
     self.write_reg(Reg.FIFO_1, 0x0f)
     # select crystal oscillator and system clock divider of 1/2
     self.write_reg(Reg.CLOCK, 0x05)
+    if self.read_reg(Reg.CLOCK) != 0x05:
+      raise Exception('Could not read back register - sanity check failed. Check wiring.')
+
     # set data rate division to Fsyck / 32 / 5
     self.write_reg(Reg.DATA_RATE, 0x04)
     # set Fpfd to 32 MHz
@@ -225,9 +228,6 @@ class A7105:
     with self.cs_low:
       self.spi.Write(pack('BB', reg, value))
 
-    # read_value = self.read_reg(reg)
-    # log.debug('read back %02x' % ( read_value ))
-
   def read_reg(self, reg):
     value = None
     with self.cs_low:
@@ -241,8 +241,6 @@ class A7105:
   def reset(self):
     log.debug('reset()')
     self.write_reg(Reg.MODE, 0x00)
-    # enable 4-wire again
-    self.write_reg(Reg.GIO1S, ENABLE_4WIRE)
 
   def write_id(self, id):
     log.debug('write_id(%s)' % format_packet(id))
