@@ -29,8 +29,8 @@ class Hubsan:
   # mystery ID from deviation
   TX_ID = '\xdb\x04\x26\x79' # also reacts without this
 
-  def __init__(self):
-    self.a7105 = A7105()
+  def __init__(self, a7105 = None):
+    self.a7105 = a7105
 
     # generate a random session ID
     self.session_id = struct.pack('BBBB', *(random.randint(0, 255) for n in xrange(4)))
@@ -39,7 +39,10 @@ class Hubsan:
     self.channel, = random.sample(Hubsan.ALLOWED_CHANNELS, 1)
 
   def init(self):
-    self.a7105.init()
+    if self.a7105 == None:
+      self.a7105 = A7105()
+
+      self.a7105.init()
 
     self.a7105.write_id(Hubsan.ID)
 

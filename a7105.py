@@ -121,8 +121,12 @@ def format_packet(packet):
 log = logging.getLogger('a7105')
 
 class A7105:
+  def __init__(self, spi = None):
+    self.spi = spi
+
   def init(self):
-    self.spi = MPSSE(SPI0, TEN_MHZ, MSB)
+    if self.spi == None:
+      self.spi = MPSSE(SPI0, TEN_MHZ, MSB)
     self.cs_low = SPIContext(self.spi)
 
     self.reset()
