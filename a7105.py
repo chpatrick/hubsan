@@ -115,8 +115,15 @@ def pbyte(byte):
 def ubyte(bytestring):
   return unpack('B', bytestring)[0]
 
+class FormatPacketLazy:
+  def __init__(self, packet):
+    self.packet = packet
+
+  def __str__(self):
+    return ' '.join('%02x' % ubyte(byte) for byte in self.packet)
+
 def format_packet(packet):
-  return ' '.join('%02x' % ubyte(byte) for byte in packet)
+  return FormatPacketLazy(packet)
 
 log = logging.getLogger('a7105')
 
@@ -162,6 +169,8 @@ class A7105:
     self.write_reg(Reg.FIFO_1, 0x0f)
     # select crystal oscillator and system clock divider of 1/2
     self.write_reg(Reg.CLOCK, 0x05)
+
+    # sanity check
     if self.read_reg(Reg.CLOCK) != 0x05:
       raise Exception('Could not read back register - sanity check failed. Check wiring.')
 
@@ -210,7 +219,7 @@ class A7105:
     log.debug('calibration complete')
 
   def calibrate_vco(self, channel):
-    log.debug('calibrating VCO channel %02x' % (channel))
+    log.debug('calibrating VCO channel %02x', channel)
     # reference code sets 0x24, 0x26 here, deviation skips
 
     self.set_channel(channel)
@@ -231,7 +240,8 @@ class A7105:
     log.debug('calibration complete')
 
   def write_reg(self, reg, value):
-    log.debug('write_reg({0}, {1:02x} == {2:08b})'.format( debug_reg[reg], value, value ))
+    #log.debug('write_reg({0}, {1:02x} == {2:08b})'.format( debug_reg[reg], value, value ))
+    log.debug('read_reg(%s, %02x)', debug_reg[reg], value)
     with self.cs_low:
       self.spi.Write(pack('BB', reg, value))
 
@@ -240,7 +250,8 @@ class A7105:
     with self.cs_low:
       self.spi.Write(pbyte(READ_BIT | reg))
       value = ubyte(self.spi.Read(1))
-    log.debug('read_reg({0}) == {1:02x} == {2:08b}'.format( debug_reg[reg], value, value ) )
+    #log.debug('read_reg({0}) == {1:02x} == {2:08b}'.format( debug_reg[reg], value, value ) )
+    log.debug('read_reg(%s) == %02x', debug_reg[reg], value)
     return value
 
   # software reset
@@ -250,24 +261,24 @@ class A7105:
     self.write_reg(Reg.MODE, 0x00)
 
   def write_id(self, id):
-    log.debug('write_id(%s)' % format_packet(id))
+    log.debug('write_id(%s)', format_packet(id))
     with self.cs_low:
       self.spi.Write(pbyte(Reg.ID) + id)
 
   def strobe(self, state):
     # A7105 datasheet says SCS should be high after only 4 bits,
     # but deviation doesn't bother
-    log.debug('strobe(%s)' % debug_state[state])
+    log.debug('strobe(%s)', debug_state[state])
     with self.cs_low:
       self.spi.Write(pbyte(state))
 
   def set_power(self, power):
-    log.debug('set_power(%s)' % debug_power[power])
+    log.debug('set_power(%s)', debug_power[power])
     pac, tbg = power_enums[power]
     self.write_reg(Reg.TX_TEST, (pac << 3) | tbg)
 
   def write_data(self, packet):
-    log.debug('write_data(%s)' % ( format_packet(packet)))
+    log.debug('write_data(%s)', format_packet(packet))
     # deviation does this all under one SPI session, I think it should be fine
     self.strobe(State.RESET_WRITE_POINTER)
     with self.cs_low:
@@ -280,6 +291,6 @@ class A7105:
       self.spi.Write(pbyte(READ_BIT | FIFO_START))
       packet = self.spi.Read(length)
     
-    log.debug('read_data(%d) == %s' % ( length, format_packet(packet) ))
+    log.debug('read_data(%d) == %s', length, format_packet(packet))
 
     return packet

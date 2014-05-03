@@ -79,7 +79,7 @@ class Hubsan:
     while time.time() < send_time + 0.015:
       if self.a7105.read_reg(Reg.MODE) & 1 == 0:
         packet = self.a7105.read_data(16)
-        log.debug('got response: ' + format_packet(packet))
+        log.debug('got response: %s', format_packet(packet))
         if packet[0] == '\xe0' or packet[0] == '\xe1':
           raise BindError()
 
@@ -127,7 +127,7 @@ class Hubsan:
     control_packet += '\x02\x64' + Hubsan.TX_ID
     control_packet += pbyte(calc_checksum(control_packet))
 
-    log.debug('sending control packet: %s' % format_packet(control_packet))
+    log.debug('sending control packet: %s', format_packet(control_packet))
 
     for i in xrange(4):
       #self.send_packet(control_packet, self.channel)
