@@ -51,32 +51,36 @@ class Hubsan:
     self.a7105.write_data(packet, channel)
     #time.sleep(0.003)
 
-    # wait for send to complete
+    time.sleep(0.002)
     for send_n in xrange(4):
-      if send_n == 3:
-        raise Exception("Sending did not complete.")
-      elif self.a7105.read_reg(Reg.MODE) & 1 == 0:
-        break
-      time.sleep(0.001)
+      if self.a7105.read_reg(Reg.MODE) & 1 == 0:
+        return
+
+    raise Exception("Sending did not complete.")
 
   def bind_stage(self, state):
     log.debug('bind stage %d' % state)
 
     packet = struct.pack('BB', state, self.channel)
     packet += self.session_id
-    packet += Hubsan.MYSTERY_CONSTANTS
-    packet += Hubsan.TX_ID
+    #packet += Hubsan.MYSTERY_CONSTANTS
+    #packet += Hubsan.TX_ID
+    packet += '\x00' * 9
     packet += pbyte(calc_checksum(packet))
 
     self.send_packet(packet, self.channel)
+    send_time = time.time()
 
     self.a7105.strobe(State.RX)
-    # time.sleep(0.00045)
 
-    for recv_n in xrange(100):
+    # poll for 15 ms for the response
+    while time.time() < send_time + 0.015:
       if self.a7105.read_reg(Reg.MODE) & 1 == 0:
         packet = self.a7105.read_data(16)
         log.debug('got response: ' + format_packet(packet))
+        if packet[0] == '\xe0' or packet[0] == '\xe1':
+          raise BindError()
+
         return packet
 
     raise BindError()
@@ -87,13 +91,9 @@ class Hubsan:
     while True:
       try:
         self.bind_stage(1)
-        #time.sleep(0.008)
         state4_response = self.bind_stage(3)
-        #self.a7105.write_id(state4_response[2:6])
         self.a7105.write_id(state4_response[2:6])
-        #time.sleep(0.008)
         self.bind_stage(1)
-        #time.sleep(0.008)
 
         break
       except BindError:
