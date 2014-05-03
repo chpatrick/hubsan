@@ -36,7 +36,7 @@ for chan in itertools.cycle(Hubsan.ALLOWED_CHANNELS):
   print "\rscanning channel %d" % chan,
   sys.stdout.flush()
   r.strobe(State.STANDBY)
-  r.write_reg(Reg.PLL_I, chan)
+  r.set_channel(chan)
 
   packet = receive()
   if packet:
@@ -46,7 +46,7 @@ for chan in itertools.cycle(Hubsan.ALLOWED_CHANNELS):
 
 print
 print "channel: %d" % ubyte(channel)
-print "session_id: " + format_packet(session_id)
+print "session_id: %s" % format_packet(session_id)
 
 last_packet_time = None
 
@@ -60,4 +60,4 @@ while True:
     now = time.time()
     elapsed = now - last_packet_time if last_packet_time else 0 
     last_packet_time = now
-    print ("%3.0f ms " % (elapsed * 1000)) + format_packet(packet)
+    print "%3.0f ms %s" % (elapsed * 1000, format_packet(packet))
