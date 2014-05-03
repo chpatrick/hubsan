@@ -244,7 +244,7 @@ class A7105:
     return value
 
   # software reset
-  # seems to make the A7105 unresponsive :/
+  # don't forget to re-enable 4-wire SPI if needed
   def reset(self):
     log.debug('reset()')
     self.write_reg(Reg.MODE, 0x00)
@@ -272,9 +272,6 @@ class A7105:
     self.strobe(State.RESET_WRITE_POINTER)
     with self.cs_low:
       self.spi.Write(pbyte(FIFO_START) + packet)
-
-    # transmit the data
-    self.strobe(State.TX)
 
   def read_data(self, length):
     self.strobe(State.RESET_READ_POINTER)

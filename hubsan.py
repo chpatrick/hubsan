@@ -50,6 +50,7 @@ class Hubsan:
   def send_packet(self, packet):
     self.a7105.strobe(State.STANDBY)
     self.a7105.write_data(packet)
+    self.a7105.strobe(State.TX)
     #time.sleep(0.003)
 
     time.sleep(0.002)
@@ -132,14 +133,16 @@ class Hubsan:
       #self.send_packet(control_packet, self.channel)
       self.a7105.strobe(State.STANDBY)
       self.a7105.write_data(control_packet)
+      self.a7105.strobe(State.TX)
       time.sleep(0.003)
     #self.send_packet(control_packet, self.channel + 0x23)
     self.a7105.strobe(State.STANDBY)
 
     self.a7105.set_channel(self.channel + 0x23)
     self.a7105.write_data(control_packet)
-    self.a7105.set_channel(self.channel)
+    self.a7105.strobe(State.TX)
     time.sleep(0.003)
+    self.a7105.set_channel(self.channel)
 
   '''
     Send a control packet using floating point values.
