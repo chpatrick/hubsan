@@ -45,10 +45,11 @@ class Hubsan:
       self.a7105.init()
 
     self.a7105.write_id(Hubsan.ID)
+    self.a7105.set_channel(self.channel)
 
-  def send_packet(self, packet, channel):
+  def send_packet(self, packet):
     self.a7105.strobe(State.STANDBY)
-    self.a7105.write_data(packet, channel)
+    self.a7105.write_data(packet)
     #time.sleep(0.003)
 
     time.sleep(0.002)
@@ -68,7 +69,7 @@ class Hubsan:
     packet += '\x00' * 9
     packet += pbyte(calc_checksum(packet))
 
-    self.send_packet(packet, self.channel)
+    self.send_packet(packet)
     send_time = time.time()
 
     self.a7105.strobe(State.RX)
@@ -113,6 +114,11 @@ class Hubsan:
     time.sleep(0.5) # wait a little bit until we can send control signals
     log.info('bind complete!')
 
+  def resume(self, session_id, channel):
+    self.session_id = session_id
+    self.channel = channel
+    self.a7105.write_id(session_id)
+
   def control_raw(self, throttle, rudder, elevator, aileron):
     control_packet = '\x20'
     for chan in [ throttle, rudder, elevator, aileron ]:
@@ -125,11 +131,14 @@ class Hubsan:
     for i in xrange(4):
       #self.send_packet(control_packet, self.channel)
       self.a7105.strobe(State.STANDBY)
-      self.a7105.write_data(control_packet, self.channel)
+      self.a7105.write_data(control_packet)
       time.sleep(0.003)
     #self.send_packet(control_packet, self.channel + 0x23)
     self.a7105.strobe(State.STANDBY)
-    self.a7105.write_data(control_packet, self.channel + 0x23)
+
+    self.a7105.set_channel(self.channel + 0x23)
+    self.a7105.write_data(control_packet)
+    self.a7105.set_channel(self.channel)
     time.sleep(0.003)
 
   '''

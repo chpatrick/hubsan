@@ -183,6 +183,9 @@ class A7105:
     # set constants
     self.write_reg(Reg.RX_DEM_TEST, 0x47)
 
+  def set_channel(self, channel):
+    self.write_reg(Reg.PLL_I, channel)
+
   # WTF: these seem to differ from the A7105 spec, this is the deviation version
   def calibrate_if(self):
     log.debug('calibrating IF bank')
@@ -210,7 +213,7 @@ class A7105:
     log.debug('calibrating VCO channel %02x' % (channel))
     # reference code sets 0x24, 0x26 here, deviation skips
 
-    self.write_reg(Reg.PLL_I, channel)
+    self.set_channel(channel)
 
     # select VCO calibration
     self.write_reg(Reg.CALIBRATION, 0b010)
@@ -263,16 +266,12 @@ class A7105:
     pac, tbg = power_enums[power]
     self.write_reg(Reg.TX_TEST, (pac << 3) | tbg)
 
-  def write_data(self, packet, channel):
-    log.debug('write_data(%s, %02x)' % ( format_packet(packet), channel ))
+  def write_data(self, packet):
+    log.debug('write_data(%s)' % ( format_packet(packet)))
     # deviation does this all under one SPI session, I think it should be fine
     self.strobe(State.RESET_WRITE_POINTER)
     with self.cs_low:
       self.spi.Write(pbyte(FIFO_START) + packet)
-
-    # select the channel
-    # WTF: do we need to do this here?
-    self.write_reg(Reg.PLL_I, channel)
 
     # transmit the data
     self.strobe(State.TX)

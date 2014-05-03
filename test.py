@@ -10,3 +10,6 @@ hubsan.bind()
 hubsan.safety()
 
 print "bind complete"
+
+while True:
+  hubsan.control(0.05, 0, 0, 0)
