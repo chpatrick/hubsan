@@ -294,3 +294,6 @@ class A7105:
     log.debug('read_data(%d) == %s', length, format_packet(packet))
 
     return packet
+
+  def close(self):
+    self.spi.Close()

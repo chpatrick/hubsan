@@ -32,20 +32,11 @@ class Hubsan:
   def __init__(self, a7105 = None):
     self.a7105 = a7105
 
-    # generate a random session ID
-    self.session_id = struct.pack('BBBB', *(random.randint(0, 255) for n in xrange(4)))
-
-    # choose a random channel
-    self.channel, = random.sample(Hubsan.ALLOWED_CHANNELS, 1)
-
   def init(self):
     if self.a7105 == None:
       self.a7105 = A7105()
 
       self.a7105.init()
-
-    self.a7105.write_id(Hubsan.ID)
-    self.a7105.set_channel(self.channel)
 
   def send_packet(self, packet):
     self.a7105.strobe(State.STANDBY)
@@ -65,8 +56,6 @@ class Hubsan:
 
     packet = struct.pack('BB', state, self.channel)
     packet += self.session_id
-    #packet += Hubsan.MYSTERY_CONSTANTS
-    #packet += Hubsan.TX_ID
     packet += '\x00' * 9
     packet += pbyte(calc_checksum(packet))
 
@@ -87,9 +76,7 @@ class Hubsan:
 
     raise BindError()
 
-  def bind(self):
-    log.info('binding started')
-
+  def handshake(self):
     while True:
       try:
         self.bind_stage(1)
@@ -109,16 +96,30 @@ class Hubsan:
       except BindError:
         continue
 
+  def bind(self, session_id = None, channel = None):
+    if session_id and channel: # resuming
+      log.info('resuming session')
+      self.session_id = session_id
+      self.channel = channel
+      self.a7105.write_id(session_id)
+      self.a7105.set_channel(self.channel)
+    else:
+      log.info('binding started')
+      # generate a random session ID
+      self.session_id = struct.pack('BBBB', *(random.randint(0, 255) for n in xrange(4)))
+
+      # choose a random channel
+      self.channel, = random.sample(Hubsan.ALLOWED_CHANNELS, 1)
+
+      self.a7105.write_id(Hubsan.ID)
+
+      self.a7105.set_channel(self.channel)
+      self.handshake()
+      time.sleep(0.5) # wait a little bit until we can send control signals
+      log.info('bind complete!')
+
     # enable CRC, id code length 4, preamble length 4
     self.a7105.write_reg(Reg.CODE_I, 0x0F)
-
-    time.sleep(0.5) # wait a little bit until we can send control signals
-    log.info('bind complete!')
-
-  def resume(self, session_id, channel):
-    self.session_id = session_id
-    self.channel = channel
-    self.a7105.write_id(session_id)
 
   def control_raw(self, throttle, rudder, elevator, aileron):
     control_packet = '\x20'
@@ -165,3 +166,6 @@ class Hubsan:
     for i in xrange(100):
       self.control(0, 0, 0, 0) # send 0 throttle for 100 cycles
     log.info('safety complete')
+
+  def close(self):
+    self.a7105.close()
