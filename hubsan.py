@@ -121,11 +121,12 @@ class Hubsan:
     # enable CRC, id code length 4, preamble length 4
     self.a7105.write_reg(Reg.CODE_I, 0x0F)
 
-  def control_raw(self, throttle, rudder, elevator, aileron):
+  def control_raw(self, throttle, rudder, elevator, aileron, leds = True, flips = False):
     control_packet = '\x20'
     for chan in [ throttle, rudder, elevator, aileron ]:
       control_packet += '\x00' + pbyte(chan)
-    control_packet += '\x02\x64' + Hubsan.TX_ID
+    flags = 0x02 | (0 if leds else 0x04) | (0x08 if flips else 0)
+    control_packet += pbyte(flags) + '\x64' + Hubsan.TX_ID
     control_packet += pbyte(calc_checksum(control_packet))
 
     log.debug('sending control packet: %s', format_packet(control_packet))
@@ -149,12 +150,12 @@ class Hubsan:
     Send a control packet using floating point values.
     Throttle ranges from 0 to 1, all others range from -1 to 1.
   '''
-  def control(self, throttle, rudder, elevator, aileron):
+  def control(self, throttle, rudder, elevator, aileron, leds = True, flips = False):
     throttle_raw = lerp(throttle, 0x00, 0xFF)
     rudder_raw = lerp((rudder + 1) / 2, 0x34, 0xCC)
     elevator_raw = lerp((elevator + 1) / 2, 0x3E, 0xBC)
     aileron_raw = lerp((-aileron + 1) / 2, 0x45, 0xC3)
-    self.control_raw(throttle_raw, rudder_raw, elevator_raw, aileron_raw)
+    self.control_raw(throttle_raw, rudder_raw, elevator_raw, aileron_raw, leds, flips)
 
   '''
     As a safety measure, the Hubsan X4 will not accept control commands until
