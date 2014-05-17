@@ -3,6 +3,8 @@ import time
 import logging
 import random
 import struct
+import math
+import random
 
 def calc_checksum(packet):
   total = 0
@@ -10,8 +12,16 @@ def calc_checksum(packet):
     total += struct.unpack('B', char)[0]
   return (256 - (total % 256)) & 0xff
 
+# linear interpolation
 def lerp(t, min, max):
   return int(round(min + t * (max - min)))
+
+# linear interpolation with probabilistic rounding
+def lerp_random(t, min, max):
+  val = min + t * (max - min)
+  val_floor = int(val)
+  offset = val - val_floor
+  return val_floor if random.random() > offset else val_floor + 1
 
 log = logging.getLogger('hubsan')
 
@@ -155,6 +165,13 @@ class Hubsan:
     rudder_raw = lerp((rudder + 1) / 2, 0x34, 0xCC)
     elevator_raw = lerp((elevator + 1) / 2, 0x3E, 0xBC)
     aileron_raw = lerp((-aileron + 1) / 2, 0x45, 0xC3)
+    self.control_raw(throttle_raw, rudder_raw, elevator_raw, aileron_raw, leds, flips)
+
+  def control_random(self, throttle, rudder, elevator, aileron, leds = True, flips = False):
+    throttle_raw = lerp_random(throttle, 0x00, 0xFF)
+    rudder_raw = lerp_random((rudder + 1) / 2, 0x34, 0xCC)
+    elevator_raw = lerp_random((elevator + 1) / 2, 0x3E, 0xBC)
+    aileron_raw = lerp_random((-aileron + 1) / 2, 0x45, 0xC3)
     self.control_raw(throttle_raw, rudder_raw, elevator_raw, aileron_raw, leds, flips)
 
   '''
